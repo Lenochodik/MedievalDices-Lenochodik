@@ -47,6 +47,16 @@ function drawAllText() {
     y: 15,
     color: color`1`
   })
+  addText("Kept", {
+    x: 0,
+    y: 4,
+    color: color`1`
+  })
+  addText("Roll", {
+    x: 0,
+    y: 7,
+    color: color`1`
+  })
 
   // Top player info
   addText(gameState.players[PLAYER_1].name, {
@@ -97,12 +107,19 @@ function drawAllText() {
   }
 }
 
+// -- Players
+function swapPlayer() {
+  gameState.currentPlayer = gameState.currentPlayer === PLAYER_1 ? PLAYER_2 : PLAYER_1
+}
+
 // -- Dices
 function randomRoll() {
-  const dicesToRoll = getAllDicesToRoll()
+  let dicesToRoll = getAllDicesToRoll()
 
   if(!dicesToRoll.length)
     moveAllKeptDicesBack()
+
+  dicesToRoll = getAllDicesToRoll()
   
   for (const diceObject of dicesToRoll) {
     const newDiceType = getRandomItem(diceCategory)
@@ -557,7 +574,8 @@ const levels = [
 
 setMap(levels[level])
 
-const gameState = {
+const initialGameState = {
+  gameOver: false,
   currentPlayer: PLAYER_1,
   players: [{
       name: "Player 1",
@@ -571,6 +589,8 @@ const gameState = {
   currentTurnScore: 0,
   winningScore: 4000,
 }
+
+let gameState = JSON.parse(JSON.stringify(initialGameState))
 
 randomRoll()
 drawAllText()
@@ -598,6 +618,8 @@ const cursorObject = getFirst(cursor)
 
 // = Inputs ========================================
 onInput("a", () => {
+  if (gameState.gameOver) return
+
   // Check bounds
   if (cursorObject.x <= CURSOR_BOUNDS_X.min) {
     playTune(tuneCursorMoveForbidden)
@@ -609,6 +631,8 @@ onInput("a", () => {
 })
 
 onInput("d", () => {
+  if (gameState.gameOver) return
+
   // Check bounds
   if (cursorObject.x >= CURSOR_BOUNDS_X.max) {
     playTune(tuneCursorMoveForbidden)
@@ -621,6 +645,8 @@ onInput("d", () => {
 
 // -- Select/deselect current dice
 onInput("k", () => {
+  if (gameState.gameOver) return
+
   // Get cursor position
   const cursorX = cursorObject.x
   const cursorY = cursorObject.y
@@ -645,6 +671,8 @@ onInput("k", () => {
 
 // -- Keep selected dices
 onInput("j", () => {
+  if (gameState.gameOver) return
+
   const selectedDices = getAllSelectedDices()
   const {score} = calcDiceScore(selectedDices)
 
@@ -654,18 +682,32 @@ onInput("j", () => {
 
   keepSelectedDices()
 
-  // Add score to current player and switch to next player
+  // Add score to current player and switch to next player (if is not winning)
   gameState.players[gameState.currentPlayer].score += gameState.currentTurnScore + score
   gameState.currentTurnScore = 0
-  gameState.currentPlayer = 1 - gameState.currentPlayer
+
+  if(gameState.players[gameState.currentPlayer].score >= gameState.winningScore) {
+    gameState.gameOver = true
+
+    addText(`${gameState.players[gameState.currentPlayer].name} won!\nPress i to start over`, {
+      // TODO: check coords
+      x: 5,
+      y: 5,
+      color: color`0`
+    })
+    return
+  }
 
   // Random roll for next player
+  swapPlayer()
   moveAllKeptDicesBack()
   randomRoll()
 })
 
 // -- Roll dices
 onInput("l", () => {
+  if (gameState.gameOver) return
+
   const selectedDices = getAllSelectedDices()
   const {score} = calcDiceScore(selectedDices)
 
@@ -677,6 +719,29 @@ onInput("l", () => {
 
   // Add score to current turn score
   gameState.currentTurnScore += score
+
+  randomRoll()
+
+  // Check if there is any score at all
+  const {scoreForCheck} = calcDiceScore(getAllDicesToRoll())
+
+  // If there is no score, switch to next player without adding score to current player
+  if(scoreForCheck === 0) {
+    gameState.currentTurnScore = 0
+
+    // TODO: add too bad, no score message
+    
+    swapPlayer()
+    moveAllKeptDicesBack()
+    randomRoll()
+  }
+})
+
+// -- Restart game
+onInput("i", () => {
+  if (!gameState.gameOver) return
+
+  gameState = JSON.parse(JSON.stringify(initialGameState))
 
   randomRoll()
 })
