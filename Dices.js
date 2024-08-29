@@ -72,7 +72,7 @@ function drawAllText() {
   addText(`Total: ${gameState.players[PLAYER_1].score}/${gameState.winningScore}`, {
     x: 0,
     y: 0,
-    color: color`0`
+    color: color`9`
   })
   if (gameState.currentPlayer === PLAYER_1) {
     addText("UR turn", {
@@ -101,7 +101,7 @@ function drawAllText() {
   addText(`Total: ${gameState.players[PLAYER_2].score}/${gameState.winningScore}`, {
     x: 0,
     y: 12,
-    color: color`0`
+    color: color`7`
   })
   if (gameState.currentPlayer === PLAYER_2) {
     addText("UR turn", {
@@ -144,10 +144,21 @@ async function randomRoll() {
 
   dicesToRoll = getAllDicesToRoll()
 
+  // Remove all dices to roll
+  for (const diceObject of dicesToRoll)
+    diceObject.remove()
+
+  await delay(500)
+
+  // Add new dices to roll
+  let i = 0;
   for (const diceObject of dicesToRoll) {
-    // TODO: animate roll
     const newDiceType = getRandomItem(diceCategory)
-    diceObject.type = newDiceType
+    // diceObject.type = newDiceType
+    addSprite(diceObject.x, diceObject.y, newDiceType)
+    playTune(rollTunes[i])
+    i++
+    await delay(150)
   }
 
   await checkForSomeScore()
@@ -369,6 +380,11 @@ const selectedDice6 = "^"
 
 // -- Cursors
 const cursor = "c"
+
+// -- Separators
+const separatorT = "t"
+const separatorB = "b"
+const separatorM = "m"
 // =================================================
 
 // = Type categories ===============================
@@ -379,7 +395,6 @@ const selectedDiceCategory = [selectedDice1, selectedDice2, selectedDice3, selec
 // = Legends, solids, pushables ====================
 setLegend(
   // -- Dices
-  // TODO: make these bitmap more nice
   [dice1, bitmap`
 .00000000000000.
 0011111111111100
@@ -601,7 +616,59 @@ setLegend(
 .....1L9CL1.....
 .....1L00L1.....
 ....1L0..0L1....
-....1L0..0L1....`]
+....1L0..0L1....`],
+  // -- Separators
+  [separatorB, bitmap`
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................
+L12L12L12L12L12L
+................
+................`],
+  [separatorT, bitmap`
+................
+................
+................
+................
+................
+................
+................
+................
+................
+L12L12L12L12L12L
+................
+................
+................
+................
+................
+................`],
+  [separatorM, bitmap`
+................
+................
+................
+................
+................
+................
+................
+L12L12L12L12L12L
+................
+................
+................
+................
+................
+................
+................
+................`],
 )
 setSolids([])
 setPushables({})
@@ -612,17 +679,18 @@ let level = 0
 const levels = [
   map`
 ..........
-..........
+tttttttttt
 ..........
 ..123456..
 ..c.......
+bbbbbbbbbb
 ..........
-..........
-..........`
+mmmmmmmmmm`
 ]
 
 const initialGameState = {
   isGameOver: false,
+  isDisabledCursor: false,
   currentPlayer: PLAYER_1,
   players: [{
       name: "Player 1",
@@ -703,11 +771,32 @@ const tuneYouWin = tune`
 187.5: B5/187.5 + C4~187.5,
 187.5: E4^187.5 + C4-187.5 + B5/187.5,
 1875`
+
+const tuneRoll1 = tune`
+500: B4^500,
+15500`
+const tuneRoll2 = tune`
+500: C5^500,
+15500`
+const tuneRoll3 = tune`
+500: D5^500,
+15500`
+const tuneRoll4 = tune`
+500: E5^500,
+15500`
+const tuneRoll5 = tune`
+500: F5^500,
+15500`
+const tuneRoll6 = tune`
+500: G5^500,
+15500`
+
+const rollTunes = [tuneRoll1, tuneRoll2, tuneRoll3, tuneRoll4, tuneRoll5, tuneRoll6]
 // =================================================
 
 // = Inputs ========================================
 onInput("a", () => {
-  if (gameState.isGameOver) return
+  if (gameState.isGameOver || gameState.isDisabledCursor) return
 
   // Check bounds
   if (cursorObject.x <= CURSOR_BOUNDS_X.min) {
@@ -720,7 +809,7 @@ onInput("a", () => {
 })
 
 onInput("d", () => {
-  if (gameState.isGameOver) return
+  if (gameState.isGameOver || gameState.isDisabledCursor) return
 
   // Check bounds
   if (cursorObject.x >= CURSOR_BOUNDS_X.max) {
@@ -734,7 +823,7 @@ onInput("d", () => {
 
 // -- Select/deselect current dice
 onInput("k", () => {
-  if (gameState.isGameOver) return
+  if (gameState.isGameOver || gameState.isDisabledCursor) return
 
   // Get cursor position
   const cursorX = cursorObject.x
@@ -762,7 +851,7 @@ onInput("k", () => {
 
 // -- Keep selected dices
 onInput("j", async () => {
-  if (gameState.isGameOver) return
+  if (gameState.isGameOver || gameState.isDisabledCursor) return
 
   const selectedDices = getAllSelectedDices()
   const { score } = calcDiceScore(selectedDices)
@@ -770,6 +859,8 @@ onInput("j", async () => {
   // Player must keep some score
   if (score === 0)
     return
+
+  gameState.isDisabledCursor = true
 
   await keepSelectedDices()
 
@@ -788,14 +879,16 @@ onInput("j", async () => {
   // Random roll for next player
   swapPlayer()
   moveAllKeptDicesBack()
+  
+  drawAllText()
   await randomRoll()
 
-  drawAllText()
+  gameState.isDisabledCursor = false
 })
 
 // -- Roll dices
 onInput("l", async () => {
-  if (gameState.isGameOver) return
+  if (gameState.isGameOver || gameState.isDisabledCursor) return
 
   const selectedDices = getAllSelectedDices()
   const { score } = calcDiceScore(selectedDices)
@@ -804,14 +897,17 @@ onInput("l", async () => {
   if (score === 0)
     return
 
+  gameState.isDisabledCursor = true
+
   await keepSelectedDices()
 
   // Add score to current turn score
   gameState.currentTurnScore += score
 
+  drawAllText()
   await randomRoll()
 
-  drawAllText()
+  gameState.isDisabledCursor = false
 })
 
 // -- Restart game
