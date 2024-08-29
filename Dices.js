@@ -1,5 +1,5 @@
 /*
-@title: Medieval Dices
+@title: Medieval Dice
 @author: Lenochodik
 @tags: ['multiplayer']
 @addedOn: 2024-00-00
@@ -9,26 +9,152 @@
 // -- Random
 // From: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 function getRandomInt(min, max) {
-const minCeiled = Math.ceil(min)
-const maxFloored = Math.floor(max)
-return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled) // The maximum is exclusive and the minimum is inclusive
+  const minCeiled = Math.ceil(min)
+  const maxFloored = Math.floor(max)
+  return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled) // The maximum is exclusive and the minimum is inclusive
 }
-  
+
 function getRandomItem(arr) {
-return arr[getRandomInt(0, arr.length)]
+  return arr[getRandomInt(0, arr.length)]
 }
 
 // -- Sprig
 function addSpriteWithReturn(x, y, spriteType) {
-    addSprite(x, y, spriteType)
-    return getAll(spriteType).at(-1) // Little bit hacky, but should work
+  addSprite(x, y, spriteType)
+  return getAll(spriteType).at(-1) // Little bit hacky, but should work
+}
+
+// -- Game UI
+function drawAllText() {
+  clearText()
+  addText(`Selected: ${calcDiceScore(getAllSelectedDices()).score}`, {
+    x:0, y:0,
+    color: color`0`
+  })
 }
 
 // -- Dices
+function getAllSelectedDices() {
+  let selected = []
+  
+  for(const diceType of selectedDiceCategory)
+    selected = [...selected, ...getAll(diceType)]
+  
+  return selected
+}
+
 function getDiceIndex(diceType) {
-    const isDiceSelected = selectedDiceCategory.includes(diceType)
-    const categoryToSearch = isDiceSelected ? selectedDiceCategory : diceCategory
-    return categoryToSearch.indexOf(diceType)
+  const isDiceSelected = selectedDiceCategory.includes(diceType)
+  const categoryToSearch = isDiceSelected ? selectedDiceCategory : diceCategory
+  return categoryToSearch.indexOf(diceType)
+}
+
+function calcDiceScore(dices) {
+  const selectedNumbers = dices.map(dice => getDiceIndex(dice.type) + 1)
+  selectedNumbers.sort()
+
+  // Count occurences of each number
+  const occurences = {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+    6: 0,
+  }
+  selectedNumbers.forEach(number => occurences[number]++)
+
+  // Calculate score
+  let score = 0
+
+  // Check for special cases 1-2-3-4-5-6
+  if (occurences[1] >= 1 && occurences[2] >= 1 && occurences[3] >= 1 && occurences[4] >= 1 && occurences[5] >= 1 && occurences[6] >= 1) {
+    score = 1500
+
+    occurences[1]--
+    occurences[2]--
+    occurences[3]--
+    occurences[4]--
+    occurences[5]--
+    occurences[6]--
+  }
+
+  // 1-2-3-4-5
+  if (occurences[1] >= 1 && occurences[2] >= 1 && occurences[3] >= 1 && occurences[4] >= 1 && occurences[5] >= 1) {
+    score = 500
+
+    occurences[1]--
+    occurences[2]--
+    occurences[3]--
+    occurences[4]--
+    occurences[5]--
+  }
+
+  // 2-3-4-5-6
+  if (occurences[2] >= 1 && occurences[3] >= 1 && occurences[4] >= 1 && occurences[5] >= 1 && occurences[6] >= 1) {
+    score = 750
+
+    occurences[2]--
+    occurences[3]--
+    occurences[4]--
+    occurences[5]--
+    occurences[6]--
+  }
+
+  // Go by numbers
+  for (let number = 1; number <= 6; number++) {
+    const occurence = occurences[number]
+
+    // Prepare base for 3,4,5,6-of-a-kind
+    const base = (number === 1 ? 10 : number) * 100
+
+    // 6-of-a-kind
+    if (occurence === 6) {
+      score += base * 8
+      occurences[number] = 0
+    }
+    // 5-of-a-kind
+    else if (occurence === 5) {
+      score += base * 4
+      occurences[number] = 0
+    }
+    // 4-of-a-kind
+    else if (occurence === 4) {
+      score += base * 2
+      occurences[number] = 0
+    }
+    // 3-of-a-kind
+    else if (occurence === 3) {
+      score += base
+      occurences[number] = 0
+    }
+    // 2-of-a-kind only for 1 and 5 (so we don't need to repeat 1-of-a-kind twice)
+    else if (occurence === 2) {
+      if (number === 1) {
+        score += 2 * 100
+        occurences[number] = 0
+      } else if (number === 5) {
+        score += 2 * 50
+        occurences[number] = 0
+      }
+    }
+    // 1-of-a-kind only for 1 and 5
+    else if (occurence === 1) {
+      if (number === 1) {
+        score += 100
+        occurences[number] = 0
+      } else if (number === 5) {
+        score += 50
+        occurences[number] = 0
+      }
+    }
+  }
+
+
+  return {
+    score: score,
+    unusedDices: occurences
+  }
 }
 // =================================================
 
@@ -62,7 +188,7 @@ const selectedDiceCategory = [selectedDice1, selectedDice2, selectedDice3, selec
 setLegend(
   // -- Dices
   // TODO: make these bitmap more nice
-  [ dice1, bitmap`
+  [dice1, bitmap`
 .00000000000000.
 0011111111111100
 0111111222222110
@@ -78,8 +204,8 @@ setLegend(
 0L11111111111110
 0L11111111111110
 00LLLLLLL1111100
-.00000000000000.` ],
-  [ dice2, bitmap`
+.00000000000000.`],
+  [dice2, bitmap`
 .00000000000000.
 0011111111111100
 0111111222222110
@@ -95,8 +221,8 @@ setLegend(
 0L11111111L00110
 0L11111111LL1110
 00LLLLLLL1111100
-.00000000000000.` ],
-  [ dice3, bitmap`
+.00000000000000.`],
+  [dice3, bitmap`
 .00000000000000.
 0011111111111100
 0111111122222210
@@ -112,8 +238,8 @@ setLegend(
 0L11111111L00110
 0L11111111LL1110
 00LLLLLLL1111100
-.00000000000000.` ],
-  [ dice4, bitmap`
+.00000000000000.`],
+  [dice4, bitmap`
 .00000000000000.
 0011111111111100
 0111111122222210
@@ -129,8 +255,8 @@ setLegend(
 0LL0011111L00110
 0LLL111111LL1110
 00LLLLLLL1111100
-.00000000000000.` ],
-  [ dice5, bitmap`
+.00000000000000.`],
+  [dice5, bitmap`
 .00000000000000.
 0011111111111100
 0111111122222210
@@ -146,8 +272,8 @@ setLegend(
 0LL0011111L00110
 0LLL111111LL1110
 00LLLLLLL1111100
-.00000000000000.` ],
-  [ dice6, bitmap`
+.00000000000000.`],
+  [dice6, bitmap`
 .00000000000000.
 0011111111111100
 0111111122222210
@@ -163,8 +289,8 @@ setLegend(
 0LL001L001L00110
 0LLL11LL11LL1110
 00LLLLLLL1111100
-.00000000000000.` ],
-[ selectedDice1, bitmap`
+.00000000000000.`],
+  [selectedDice1, bitmap`
 .33333333333333.
 3311111111111133
 3111111222222113
@@ -180,8 +306,8 @@ setLegend(
 3L11111111111113
 3L11111111111113
 33LLLLLLL1111133
-.33333333333333.` ],
-[ selectedDice2, bitmap`
+.33333333333333.`],
+  [selectedDice2, bitmap`
 .33333333333333.
 3311111111111133
 3111111222222113
@@ -197,8 +323,8 @@ setLegend(
 3L11111111L00113
 3L11111111LL1113
 33LLLLLLL1111133
-.33333333333333.` ],
-   [ selectedDice3, bitmap`
+.33333333333333.`],
+  [selectedDice3, bitmap`
 .33333333333333.
 3311111111111133
 3111111122222213
@@ -214,8 +340,8 @@ setLegend(
 3L11111111L00113
 3L11111111LL1113
 33LLLLLLL1111133
-.33333333333333.` ],
-   [ selectedDice4, bitmap`
+.33333333333333.`],
+  [selectedDice4, bitmap`
 .33333333333333.
 3311111111111133
 3111111122222213
@@ -231,8 +357,8 @@ setLegend(
 3LL0011111L00113
 3LLL111111LL1113
 33LLLLLLL1111133
-.33333333333333.` ],
-    [ selectedDice5, bitmap`
+.33333333333333.`],
+  [selectedDice5, bitmap`
 .33333333333333.
 3311111111111133
 3111111122222213
@@ -248,8 +374,8 @@ setLegend(
 3LL0011111L00113
 3LLL111111LL1113
 33LLLLLLL1111133
-.33333333333333.` ],
-    [ selectedDice6, bitmap`
+.33333333333333.`],
+  [selectedDice6, bitmap`
 .33333333333333.
 3311111111111133
 3111111122222213
@@ -265,9 +391,9 @@ setLegend(
 3LL001L001L00113
 3LLL11LL11LL1113
 33LLLLLLL1111133
-.33333333333333.` ],
+.33333333333333.`],
   // -- Cursor
-  [ cursor, bitmap`
+  [cursor, bitmap`
 ................
 .......LL.......
 ......L1LL......
@@ -283,7 +409,7 @@ setLegend(
 .....1L9CL1.....
 .....1L00L1.....
 ....1L0..0L1....
-....1L0..0L1....` ]
+....1L0..0L1....`]
 )
 setSolids([])
 setPushables({})
@@ -295,9 +421,9 @@ const levels = [
   map`
 ..........
 ..........
+..........
 ..123456..
 ..c.......
-..........
 ..........
 ..........
 ..........`
@@ -306,20 +432,21 @@ const levels = [
 setMap(levels[level])
 
 const gameState = {
-    currentPlayer: 0,
-    players: [
-        {
-            name: "Player 1",
-            score: 0,
-        },
-        {
-            name: "Player 2",
-            score: 0,
-        }
-    ],
-    currentTurnScore: 0,
-    winningScore: 4000,
+  currentPlayer: 0,
+  players: [{
+      name: "Player 1",
+      score: 0,
+    },
+    {
+      name: "Player 2",
+      score: 0,
+    }
+  ],
+  currentTurnScore: 0,
+  winningScore: 4000,
 }
+
+drawAllText()
 // =================================================
 
 // = Melodies, sounds ==============================
@@ -346,18 +473,18 @@ const cursorObject = getFirst(cursor)
 // = Inputs ========================================
 onInput("a", () => {
   // Check bounds
-  if(cursorObject.x <= cursorBoundsX.min) {
+  if (cursorObject.x <= cursorBoundsX.min) {
     playTune(tuneCursorMoveForbidden)
     return
   }
-  
+
   cursorObject.x--
   playTune(tuneCursorMove)
 })
 
 onInput("d", () => {
   // Check bounds
-  if(cursorObject.x >= cursorBoundsX.max) {
+  if (cursorObject.x >= cursorBoundsX.max) {
     playTune(tuneCursorMoveForbidden)
     return
   }
@@ -368,16 +495,20 @@ onInput("d", () => {
 
 // -- Select/deselect current dice
 onInput("k", () => {
-    // Get cursor position
-    const cursorX = cursorObject.x
-    const cursorY = cursorObject.y
+  // Get cursor position
+  const cursorX = cursorObject.x
+  const cursorY = cursorObject.y
 
-    // Get current dice (above cursor)
-    const diceObject = getTile(cursorX, cursorY - 1)[0]
-    const isDiceSelected = selectedDiceCategory.includes(diceObject.type)
-    const diceIndex = getDiceIndex(diceObject.type)
+  // Get current dice (above cursor)
+  const diceObject = getTile(cursorX, cursorY - 1)[0]
+  const isDiceSelected = selectedDiceCategory.includes(diceObject.type)
+  const diceIndex = getDiceIndex(diceObject.type)
 
-    // Select/deselect dice
-    diceObject.type = isDiceSelected ? diceCategory[diceIndex] : selectedDiceCategory[diceIndex]
+  // Select/deselect dice
+  diceObject.type = isDiceSelected ? diceCategory[diceIndex] : selectedDiceCategory[diceIndex]
+})
+
+afterInput(() => {
+  drawAllText()
 })
 // =================================================
