@@ -5,8 +5,18 @@
 @addedOn: 2024-00-00
 */
 
+// = Constants =====================================
+const CURSOR_BOUNDS_X = {
+  // both inclusive
+  min: 2,
+  max: 7,
+}
+
 const PLAYER_1 = 0
 const PLAYER_2 = 1
+
+const DICES_Y = 3
+// =================================================
 
 // = Helper functions ==============================
 // -- Random
@@ -32,7 +42,7 @@ function drawAllText() {
   clearText()
 
   // HELP
-  addText("J - keep ; L - throw", {
+  addText(" J - pass, L - roll", {
     x: 0,
     y: 15,
     color: color`1`
@@ -88,6 +98,68 @@ function drawAllText() {
 }
 
 // -- Dices
+function randomRoll() {
+  const dicesToRoll = getAllDicesToRoll()
+
+  if(!dicesToRoll.length)
+    moveAllKeptDicesBack()
+  
+  for (const diceObject of dicesToRoll) {
+    const newDiceType = getRandomItem(diceCategory)
+    diceObject.type = newDiceType
+  }
+}
+
+function keepSelectedDices() {
+  const selectedDices = getAllSelectedDices()
+  const {unusedDices} = calcDiceScore(selectedDices)
+
+  for(const diceObject of selectedDices) {
+    const diceIndex = getDiceIndex(diceObject.type)
+    const diceNumber = diceIndex + 1
+
+    // If dice is not used, leave it
+    if(unusedDices[diceNumber] >= 1) {
+      unusedDices[diceNumber]--
+      diceObject.type = diceCategory[diceIndex]
+      continue
+    }
+
+    // Move dice up as player keeps it
+    diceObject.y--
+    diceObject.type = diceCategory[diceIndex]
+  }
+}
+
+function moveAllKeptDicesBack() {
+  const keptDices = getAllKeptDices()
+
+  for (const diceObject of keptDices)
+    diceObject.y++
+}
+
+function getAllKeptDices() {
+  let dices = []
+  for (let x = CURSOR_BOUNDS_X.min; x <= CURSOR_BOUNDS_X.max; x++) {
+    const tileSprites = getTile(x, DICES_Y - 1)
+    if(!tileSprites.length)
+      continue
+    dices.push(tileSprites[0])
+  }
+  return dices
+}
+
+function getAllDicesToRoll() {
+  let dices = []
+  for (let x = CURSOR_BOUNDS_X.min; x <= CURSOR_BOUNDS_X.max; x++) {
+    const tileSprites = getTile(x, DICES_Y)
+    if(!tileSprites.length)
+      continue
+    dices.push(tileSprites[0])
+  }
+  return dices
+}
+
 function getAllSelectedDices() {
   let selected = []
   
@@ -500,6 +572,7 @@ const gameState = {
   winningScore: 4000,
 }
 
+randomRoll()
 drawAllText()
 // =================================================
 
@@ -519,14 +592,6 @@ const tuneCursorDeselect = tune`
 11625`
 // =================================================
 
-// = Constants =====================================
-const cursorBoundsX = {
-  // both inclusive
-  min: 2,
-  max: 7,
-}
-// =================================================
-
 // = Objects =======================================
 const cursorObject = getFirst(cursor)
 // =================================================
@@ -534,7 +599,7 @@ const cursorObject = getFirst(cursor)
 // = Inputs ========================================
 onInput("a", () => {
   // Check bounds
-  if (cursorObject.x <= cursorBoundsX.min) {
+  if (cursorObject.x <= CURSOR_BOUNDS_X.min) {
     playTune(tuneCursorMoveForbidden)
     return
   }
@@ -545,7 +610,7 @@ onInput("a", () => {
 
 onInput("d", () => {
   // Check bounds
-  if (cursorObject.x >= cursorBoundsX.max) {
+  if (cursorObject.x >= CURSOR_BOUNDS_X.max) {
     playTune(tuneCursorMoveForbidden)
     return
   }
@@ -581,31 +646,39 @@ onInput("k", () => {
 // -- Keep selected dices
 onInput("j", () => {
   const selectedDices = getAllSelectedDices()
-  const {score, unusedDices} = calcDiceScore(selectedDices)
+  const {score} = calcDiceScore(selectedDices)
 
   // Player must keep some score
   if(score === 0)
     return
 
-  for(const diceObject of selectedDices) {
-    const diceIndex = getDiceIndex(diceObject.type)
-    const diceNumber = diceIndex + 1
+  keepSelectedDices()
 
-    // If dice is not used, leave it
-    if(unusedDices[diceNumber] >= 1) {
-      unusedDices[diceNumber]--
-      diceObject.type = diceCategory[diceIndex]
-      continue
-    }
-
-    // Move dice up as player keeps it
-    diceObject.y--
-    diceObject.type = diceCategory[diceIndex]
-  }
-
+  // Add score to current player and switch to next player
   gameState.players[gameState.currentPlayer].score += gameState.currentTurnScore + score
   gameState.currentTurnScore = 0
   gameState.currentPlayer = 1 - gameState.currentPlayer
+
+  // Random roll for next player
+  moveAllKeptDicesBack()
+  randomRoll()
+})
+
+// -- Roll dices
+onInput("l", () => {
+  const selectedDices = getAllSelectedDices()
+  const {score} = calcDiceScore(selectedDices)
+
+  // Player must keep some score
+  if(score === 0)
+    return
+
+  keepSelectedDices()
+
+  // Add score to current turn score
+  gameState.currentTurnScore += score
+
+  randomRoll()
 })
 
 afterInput(() => {
