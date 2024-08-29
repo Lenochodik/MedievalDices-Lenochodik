@@ -19,6 +19,11 @@ const DICES_Y = 3
 // =================================================
 
 // = Helper functions ==============================
+// -- Delay
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 // -- Random
 // From: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 function getRandomInt(min, max) {
@@ -70,6 +75,11 @@ function drawAllText() {
     color: color`0`
   })
   if (gameState.currentPlayer === PLAYER_1) {
+    addText("UR turn", {
+      x: 12,
+      y: 2,
+      color: color`3`
+    })
     addText(`Turn:  ${gameState.currentTurnScore}`, {
       x: 0,
       y: 1,
@@ -94,6 +104,11 @@ function drawAllText() {
     color: color`0`
   })
   if (gameState.currentPlayer === PLAYER_2) {
+    addText("UR turn", {
+      x: 12,
+      y: 14,
+      color: color`5`
+    })
     addText(`Turn:  ${gameState.currentTurnScore}`, {
       x: 0,
       y: 13,
@@ -121,7 +136,7 @@ function swapPlayer() {
 }
 
 // -- Dices
-function randomRoll() {
+async function randomRoll() {
   let dicesToRoll = getAllDicesToRoll()
 
   if (!dicesToRoll.length)
@@ -130,14 +145,15 @@ function randomRoll() {
   dicesToRoll = getAllDicesToRoll()
 
   for (const diceObject of dicesToRoll) {
+    // TODO: animate roll
     const newDiceType = getRandomItem(diceCategory)
     diceObject.type = newDiceType
   }
 
-  checkForSomeScore()
+  await checkForSomeScore()
 }
 
-function checkForSomeScore() {
+async function checkForSomeScore() {
   // Check if there is any score at all
   const { score: scoreForCheck } = calcDiceScore(getAllDicesToRoll())
 
@@ -145,15 +161,18 @@ function checkForSomeScore() {
   if (scoreForCheck === 0) {
     gameState.currentTurnScore = 0
 
-    // TODO: add too bad, no score message
+    playTune(tuneTooBadNoScore)
+
+    await delay(2500)
 
     swapPlayer()
     moveAllKeptDicesBack()
-    randomRoll()
+    drawAllText()
+    await randomRoll()
   }
 }
 
-function keepSelectedDices() {
+async function keepSelectedDices() {
   const selectedDices = getAllSelectedDices()
   const { unusedDices } = calcDiceScore(selectedDices)
 
@@ -165,12 +184,14 @@ function keepSelectedDices() {
     if (unusedDices[diceNumber] >= 1) {
       unusedDices[diceNumber]--
       diceObject.type = diceCategory[diceIndex]
-      continue
+    }
+    // Move dice up as player keeps it
+    else {
+      diceObject.y--
+      diceObject.type = diceCategory[diceIndex]
     }
 
-    // Move dice up as player keeps it
-    diceObject.y--
-    diceObject.type = diceCategory[diceIndex]
+    await delay(250)
   }
 }
 
@@ -208,6 +229,8 @@ function getAllSelectedDices() {
 
   for (const diceType of selectedDiceCategory)
     selected = [...selected, ...getAll(diceType)]
+
+  selected.sort((a, b) => a.x - b.x) // Sort by x position (for animations)
 
   return selected
 }
@@ -618,13 +641,14 @@ let gameState = JSON.parse(JSON.stringify(initialGameState))
 
 let cursorObject = getFirst(cursor)
 
-function newGame() {
+async function newGame() {
   setMap(levels[level])
   gameState = JSON.parse(JSON.stringify(initialGameState))
   cursorObject = getFirst(cursor)
 
-  randomRoll()
   drawAllText()
+
+  await randomRoll()
 }
 newGame()
 // =================================================
@@ -643,6 +667,42 @@ const tuneCursorSelect = tune`
 const tuneCursorDeselect = tune`
 375: A4/375,
 11625`
+
+const tuneTooBadNoScore = tune`
+187.5: C5^187.5 + E5~187.5,
+187.5: B4^187.5 + D5~187.5,
+187.5: A4^187.5 + C5~187.5,
+187.5: G4^187.5 + B4~187.5,
+187.5: F4^187.5 + A4~187.5,
+187.5: E4^187.5 + G4~187.5,
+187.5: D4^187.5 + F4~187.5,
+187.5: C4^187.5 + E4~187.5,
+4500`
+
+const tuneYouWin = tune`
+187.5: E5/187.5 + C4~187.5,
+187.5: E5/187.5 + E4^187.5 + C4-187.5,
+187.5: E5/187.5 + C4~187.5,
+187.5: E4^187.5 + C4-187.5,
+187.5: C4~187.5,
+187.5: G5/187.5 + E4^187.5 + C4-187.5,
+187.5: E5/187.5 + C4~187.5,
+187.5: G5/187.5 + E4^187.5 + C4-187.5,
+187.5: E5/187.5 + C4~187.5,
+187.5: E4^187.5 + C4-187.5,
+187.5: C4~187.5,
+187.5: B5/187.5 + E4^187.5 + C4-187.5,
+187.5: B5/187.5 + C4~187.5,
+187.5: B5/187.5 + E4^187.5 + C4-187.5,
+187.5: B5/187.5 + C4~187.5,
+187.5: A5/187.5 + E4^187.5 + C4-187.5,
+187.5: A5/187.5 + C4~187.5,
+187.5: G5/187.5 + E4^187.5 + C4-187.5,
+187.5: G5/187.5 + C4~187.5,
+187.5: E4^187.5 + C4-187.5,
+187.5: B5/187.5 + C4~187.5,
+187.5: E4^187.5 + C4-187.5 + B5/187.5,
+1875`
 // =================================================
 
 // = Inputs ========================================
@@ -696,10 +756,12 @@ onInput("k", () => {
   diceObject.type = isDiceSelected ? diceCategory[diceIndex] : selectedDiceCategory[diceIndex]
 
   playTune(isDiceSelected ? tuneCursorDeselect : tuneCursorSelect)
+
+  drawAllText()
 })
 
 // -- Keep selected dices
-onInput("j", () => {
+onInput("j", async () => {
   if (gameState.isGameOver) return
 
   const selectedDices = getAllSelectedDices()
@@ -709,26 +771,30 @@ onInput("j", () => {
   if (score === 0)
     return
 
-  keepSelectedDices()
+  await keepSelectedDices()
 
   // Add score to current player and switch to next player (if is not winning)
   gameState.players[gameState.currentPlayer].score += gameState.currentTurnScore + score
   gameState.currentTurnScore = 0
 
   if (gameState.players[gameState.currentPlayer].score >= gameState.winningScore) {
+    playTune(tuneYouWin)
     gameState.isGameOver = true
     cursorObject.remove()
+    drawAllText()
     return
   }
 
   // Random roll for next player
   swapPlayer()
   moveAllKeptDicesBack()
-  randomRoll()
+  await randomRoll()
+
+  drawAllText()
 })
 
 // -- Roll dices
-onInput("l", () => {
+onInput("l", async () => {
   if (gameState.isGameOver) return
 
   const selectedDices = getAllSelectedDices()
@@ -738,12 +804,14 @@ onInput("l", () => {
   if (score === 0)
     return
 
-  keepSelectedDices()
+  await keepSelectedDices()
 
   // Add score to current turn score
   gameState.currentTurnScore += score
 
-  randomRoll()
+  await randomRoll()
+
+  drawAllText()
 })
 
 // -- Restart game
@@ -751,9 +819,5 @@ onInput("i", () => {
   if (!gameState.isGameOver) return
 
   newGame()
-})
-
-afterInput(() => {
-  drawAllText()
 })
 // =================================================
