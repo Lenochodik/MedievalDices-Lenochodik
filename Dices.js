@@ -5,6 +5,9 @@
 @addedOn: 2024-00-00
 */
 
+const PLAYER_1 = 0
+const PLAYER_2 = 1
+
 // = Helper functions ==============================
 // -- Random
 // From: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
@@ -27,10 +30,61 @@ function addSpriteWithReturn(x, y, spriteType) {
 // -- Game UI
 function drawAllText() {
   clearText()
-  addText(`Selected: ${calcDiceScore(getAllSelectedDices()).score}`, {
-    x:0, y:0,
+
+  // HELP
+  addText("J - keep ; L - throw", {
+    x: 0,
+    y: 15,
+    color: color`1`
+  })
+
+  // Top player info
+  addText(gameState.players[PLAYER_1].name, {
+    x: 12,
+    y: 1,
+    color: color`3`
+  })
+  addText(`Total: ${gameState.players[PLAYER_1].score}/${gameState.winningScore}`, {
+    x: 0,
+    y: 0,
     color: color`0`
   })
+  if(gameState.currentPlayer === PLAYER_1) {
+    addText(`Turn:  ${gameState.currentTurnScore}`, {
+      x: 0,
+      y: 1,
+      color: color`0`
+    })
+    addText(`Slctd: ${calcDiceScore(getAllSelectedDices()).score}`, {
+      x: 0,
+      y: 2,
+      color: color`0`
+    })
+  }
+
+  // Bottom player info
+  addText(gameState.players[PLAYER_2].name, {
+    x: 12,
+    y: 13,
+    color: color`5`
+  })
+  addText(`Total: ${gameState.players[PLAYER_2].score}/${gameState.winningScore}`, {
+    x: 0,
+    y: 12,
+    color: color`0`
+  })
+  if(gameState.currentPlayer === PLAYER_2) {
+    addText(`Turn:  ${gameState.currentTurnScore}`, {
+      x: 0,
+      y: 13,
+      color: color`0`
+    })
+    addText(`Slctd: ${calcDiceScore(getAllSelectedDices()).score}`, {
+      x: 0,
+      y: 14,
+      color: color`0`
+    })
+  }
 }
 
 // -- Dices
@@ -432,7 +486,7 @@ const levels = [
 setMap(levels[level])
 
 const gameState = {
-  currentPlayer: 0,
+  currentPlayer: PLAYER_1,
   players: [{
       name: "Player 1",
       score: 0,
@@ -456,6 +510,13 @@ const tuneCursorMove = tune`
 const tuneCursorMoveForbidden = tune`
 500: A4~500 + G4~500 + B4~500,
 15500`
+
+const tuneCursorSelect = tune`
+375: C5/375,
+11625`
+const tuneCursorDeselect = tune`
+375: A4/375,
+11625`
 // =================================================
 
 // = Constants =====================================
@@ -500,12 +561,51 @@ onInput("k", () => {
   const cursorY = cursorObject.y
 
   // Get current dice (above cursor)
-  const diceObject = getTile(cursorX, cursorY - 1)[0]
+  const diceTile = getTile(cursorX, cursorY - 1)
+
+  if(diceTile.length === 0) {
+    playTune(tuneCursorMoveForbidden)
+    return
+  }
+
+  const diceObject = diceTile[0]
   const isDiceSelected = selectedDiceCategory.includes(diceObject.type)
   const diceIndex = getDiceIndex(diceObject.type)
 
   // Select/deselect dice
   diceObject.type = isDiceSelected ? diceCategory[diceIndex] : selectedDiceCategory[diceIndex]
+
+  playTune(isDiceSelected ? tuneCursorDeselect : tuneCursorSelect)
+})
+
+// -- Keep selected dices
+onInput("j", () => {
+  const selectedDices = getAllSelectedDices()
+  const {score, unusedDices} = calcDiceScore(selectedDices)
+
+  // Player must keep some score
+  if(score === 0)
+    return
+
+  for(const diceObject of selectedDices) {
+    const diceIndex = getDiceIndex(diceObject.type)
+    const diceNumber = diceIndex + 1
+
+    // If dice is not used, leave it
+    if(unusedDices[diceNumber] >= 1) {
+      unusedDices[diceNumber]--
+      diceObject.type = diceCategory[diceIndex]
+      continue
+    }
+
+    // Move dice up as player keeps it
+    diceObject.y--
+    diceObject.type = diceCategory[diceIndex]
+  }
+
+  gameState.players[gameState.currentPlayer].score += gameState.currentTurnScore + score
+  gameState.currentTurnScore = 0
+  gameState.currentPlayer = 1 - gameState.currentPlayer
 })
 
 afterInput(() => {
