@@ -1,8 +1,38 @@
 /*
 @title: Medieval Dice
 @author: Lenochodik
-@tags: ['multiplayer']
+@tags: ['multiplayer', 'dice']
 @addedOn: 2024-00-00
+*/
+
+/*
+Controls:
+- A/D - move cursor
+- K   - select dice
+- J   - pass = score and swap player to move
+- L   - roll = score and roll the remaining dices
+- I   - start new game
+
+Scoring:
+- 1 is worth 100 points
+- 5 is worth 50 points
+- Sequence 1-2-3-4-5-6 is worth 1500 points
+- Sequence 1-2-3-4-5 is worth 500 points
+- Sequence 2-3-4-5-6 is worth 750 points
+- Three of a kind is worth number * 100 points (e.g. 3-3-3 is 300, 5-5-5 is 500, but 1-1-1 is 1000)
+- Four of a kind is worth 2 * number * 100 points
+- Five of a kind is worth 4 * number * 100 points
+- Six  of a kind is worth 8 * number * 100 points
+
+Rules:
+- First player to score total of 4000 points wins!
+- Roll a dice
+- If there is no score you could choose, you lose your turn a next player moves
+- Otherwise select dices with some score and choose if you want to pass or roll again
+  - Pass = score and swap player
+  - Roll = score and roll the remaining dices
+- If you choose to roll again but there are no dices left, roll all of them
+- Repeat unless you pass or lose the turn
 */
 
 // = Constants =====================================
@@ -55,12 +85,12 @@ function drawAllText() {
   addText("Kept", {
     x: 0,
     y: 4,
-    color: color`1`
+    color: color`2`
   })
   addText("Roll", {
     x: 0,
     y: 7,
-    color: color`1`
+    color: color`2`
   })
 
   // Top player info
@@ -126,7 +156,7 @@ function drawAllText() {
     addText(`   ${gameState.players[gameState.currentPlayer].name} won!\n Press i to start`, {
       x: 1,
       y: 9,
-      color: color`D`
+      color: color`6`
     })
 }
 
@@ -377,6 +407,10 @@ const selectedDice4 = "$"
 const selectedDice5 = "%"
 const selectedDice6 = "^"
 
+const background1 = ">"
+const background2 = "<"
+const background3 = "-"
+
 
 // -- Cursors
 const cursor = "c"
@@ -601,22 +635,22 @@ setLegend(
 .33333333333333.`],
   // -- Cursor
   [cursor, bitmap`
-................
-.......LL.......
-......L1LL......
-.....L1L11L.....
-....LLLLLLLL....
-.......C9.......
-.......9C.......
-.......C9.......
-.......9C.......
-.......C9.......
-.......9C.......
-......1991......
-.....1L9CL1.....
-.....1L00L1.....
-....1L0..0L1....
-....1L0..0L1....`],
+.......22.......
+......2LL2......
+.....2L1LL2.....
+....2L1L11L2....
+...2LLLLLLLL2...
+....222C9222....
+......29C2......
+......2C92......
+......29C2......
+......2C92......
+......29C2......
+.....219912.....
+....21L9CL12....
+....21L00L12....
+...21L0220L12...
+...21L0220L12...`],
   // -- Separators
   [separatorB, bitmap`
 ................
@@ -633,18 +667,18 @@ setLegend(
 ................
 ................
 L12L12L12L12L12L
-................
-................`],
+2222222222222222
+2222222222222222`],
   [separatorT, bitmap`
-................
-................
-................
-................
-................
-................
-................
-................
-................
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
 L12L12L12L12L12L
 ................
 ................
@@ -653,38 +687,91 @@ L12L12L12L12L12L
 ................
 ................`],
   [separatorM, bitmap`
-................
-................
-................
-................
-................
-................
-................
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
 L12L12L12L12L12L
-................
-................
-................
-................
-................
-................
-................
-................`],
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222`],
+
+   [background1, bitmap`
+DFD44444DFFD4444
+DFFDD44DFFD44DD4
+D4FFFD4D4D44DDF4
+DF4DFFD44D44DFF4
+DFD44FDD444D4F4D
+4FD4444FFF4D4FD4
+4FF444FF4FD444DF
+DDFF44FD44FD44F4
+FD44F4FD44FF44FD
+FDD4FD44D44F44F4
+4FD444DDDF4F4DDF
+D444DD4D4FF4DDF4
+44FDD44D4F44DFF4
+44FF44FFDF44DF4D
+DD4FF4FD44D444DD
+4DD4F4F444DD44D4`],
+   [background2, bitmap`
+7777777777777777
+77LL77777777L777
+7LLLL777777LLL77
+LLLLLL7777LLLLL7
+711117777LLLLLLL
+71LL177777111117
+71LL1777771L1L17
+7111171717111117
+1111111111111111
+1111111111111111
+1L111L111L111L11
+111L111L111L111L
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111`],
+   [background3, bitmap`
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222
+2222222222222222`],
 )
 setSolids([])
 setPushables({})
+setBackground(background2)
 // =================================================
 
 // = Levels ========================================
 let level = 0
 const levels = [
   map`
-..........
+----------
 tttttttttt
 ..........
 ..123456..
 ..c.......
 bbbbbbbbbb
-..........
+----------
 mmmmmmmmmm`
 ]
 
